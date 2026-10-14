@@ -1,7 +1,6 @@
 # Building Change Map (prototype)
 
 Interactive map of building changes (gone / new) in Bangkok, loaded from CSV.
-See [CLAUDE.md](CLAUDE.md) for the full brief, data formats and architecture.
 
 ## Run
 
