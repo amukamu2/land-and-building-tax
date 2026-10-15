@@ -15,19 +15,19 @@ function show(value: string | number | null | undefined): string {
 
 <template>
   <div class="details">
-    <p v-if="features.length > 1" class="hint">{{ features.length }} points at this spot</p>
+    <p v-if="features.length > 1" class="hint">{{ features.length }} points at this location</p>
     <article v-for="(f, i) in features" :key="i":style="{ borderLeftColor: CHANGE_COLORS[f.type] }">
       <h3>{{ f.id }} <small>{{ KIND_LABELS[f.kind] }}</small></h3>
       <dl>
         <dt>Type</dt>
-        <dd>{{ CHANGE_LABELS[f.type] }} <span class="raw">({{ f.rawType || 'empty' }})</span></dd>
+        <dd>{{ CHANGE_LABELS[f.type] }} <span class="raw">({{ f.rawType || 'Not provided' }})</span></dd>
         <dt>Test area</dt>
         <dd>{{ show(f.placeId) }}</dd>
         <dt>Year first seen</dt>
         <dd>{{ show(f.yearFirstSeen) }}</dd>
         <!-- Optional fields: only shown when the source table had the column. -->
         <template v-if="'areaM2' in f">
-          <dt>Area</dt>
+          <dt>Building area</dt>
           <dd>{{ f.areaM2 != null ? `${f.areaM2.toLocaleString()} m²` : '—' }}</dd>
         </template>
         <template v-if="'isLowRise' in f">
@@ -35,7 +35,7 @@ function show(value: string | number | null | undefined): string {
           <dd>{{ yesNo(f.isLowRise) }}</dd>
         </template>
         <template v-if="'addedAfterCode' in f">
-          <dt>Added after seeing code?</dt>
+          <dt>Added after code?</dt>
           <dd>{{ yesNo(f.addedAfterCode) }}</dd>
         </template>
         <template v-if="'note' in f">

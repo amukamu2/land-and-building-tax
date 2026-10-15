@@ -14,7 +14,7 @@ const types: ChangeType[] = ['gone', 'new', 'unknown']
     </li>
     <li>
       <span class="dot ring"></span>
-      Ring = answer key (A…), dot = code output (C…)
+      Ring = answer key (A…) · solid dot = model output (C…)
     </li>
     <li>
       <span class="box" :style="{ borderColor: TEST_AREA_COLOR }"></span>

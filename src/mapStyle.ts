@@ -14,7 +14,7 @@ export const CHANGE_LABELS: Record<ChangeType, string> = {
 };
 
 export const KIND_LABELS: Record<RowKind, string> = {
-  code: "Code output (C…)",
+  code: "Model output (C…)",
   answer: "Answer key (A…)",
   other: "Other",
 };

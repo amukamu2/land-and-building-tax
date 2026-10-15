@@ -35,12 +35,13 @@ function onDrop(e: DragEvent) {
   >
     <input type="file" accept=".csv,text/csv" :multiple="multiple" @change="onChange" />
     <strong>{{ label }}</strong>
-    <span>Drop CSV{{ multiple ? ' file(s)' : '' }} here or click to choose</span>
+    <span>Drop CSV files here or click to browse</span>
   </label>
 </template>
 
 <style scoped>
 .drop {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -58,6 +59,15 @@ function onDrop(e: DragEvent) {
   background: #eef4fb;
 }
 input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.drop:focus-within {
+  outline: 2px solid #43835b;
+  outline-offset: 2px;
 }
 </style>
