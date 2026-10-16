@@ -5,6 +5,8 @@ import FileUpload from './components/FileUpload.vue'
 import Legend from './components/Legend.vue'
 import LoadReportView from './components/LoadReportView.vue'
 import ChangeDetails from './components/ChangeDetails.vue'
+import Chevron from './components/Chevron.vue'
+import SelectMenu, { type SelectOption } from './components/SelectMenu.vue'
 import { useBuildingChanges } from './composables/useBuildingChanges'
 import { CsvSource } from './data/CsvSource'
 import type { ChangeCollection, ChangeProps, ChangeType, RowKind } from './data/BuildingChangeSource'
@@ -60,6 +62,14 @@ const years = computed(() =>
     .filter((y): y is number => y !== null)
     .sort((a, b) => a - b),
 )
+const yearOptions = computed<SelectOption<number | 'all'>[]>(() => [
+  { value: 'all', label: 'All years' },
+  ...years.value.map((y) => ({ value: y, label: String(y) })),
+])
+const areaOptions = computed<SelectOption<string>[]>(() => [
+  { value: '', label: testAreas.value.features.length ? 'Select an area to zoom to' : 'Import an area CSV to enable' },
+  ...testAreas.value.features.map(({ properties: a }) => ({ value: a.id, label: `${a.id} · ${a.name}` })),
+])
 // Only offer the "Rows" filter when the data actually mixes answer key and code rows.
 const kindsPresent = computed(() => allKinds.filter((k) => changes.value.features.some((f) => f.properties.kind === k)))
 
@@ -85,9 +95,7 @@ const filteredChanges = computed<ChangeCollection>(() => ({
         :title="sidebarOpen ? 'Hide panel' : 'Show panel'"
         @click="sidebarOpen = !sidebarOpen"
       >
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-          <path d="M10 3.5 5.5 8l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
+        <Chevron />
         <span class="visually-hidden">{{ sidebarOpen ? 'Hide panel' : 'Show panel' }}</span>
       </button>
 
@@ -164,18 +172,16 @@ const filteredChanges = computed<ChangeCollection>(() => ({
 
           <label class="field-label" for="area-select">Zoom to test area</label>
           <!-- Vue: `v-model` ≈ Angular `[(ngModel)]` two-way binding. -->
-          <select id="area-select" v-model="selectedAreaId" :disabled="!testAreas.features.length" @change="zoomToArea">
-            <option value="">{{ testAreas.features.length ? 'Select an area to zoom to' : 'Import an area CSV to enable' }}</option>
-            <option v-for="a in testAreas.features" :key="a.properties.id" :value="a.properties.id">
-              {{ a.properties.id }} · {{ a.properties.name }}
-            </option>
-          </select>
+          <SelectMenu
+            id="area-select"
+            v-model="selectedAreaId"
+            :options="areaOptions"
+            :disabled="!testAreas.features.length"
+            @change="zoomToArea"
+          />
 
           <label class="field-label" for="year-select">Year first seen</label>
-          <select id="year-select" v-model="year">
-            <option value="all">All years</option>
-            <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-          </select>
+          <SelectMenu id="year-select" v-model="year" :options="yearOptions" />
 
           <span class="field-label type-label">Change type</span>
           <div class="filter-chips" role="group" aria-label="Change type">
@@ -187,7 +193,7 @@ const filteredChanges = computed<ChangeCollection>(() => ({
           </div>
 
           <details v-if="kindsPresent.length > 1" class="advanced-filter">
-            <summary>Data source</summary>
+            <summary class="disclosure">Data source<Chevron /></summary>
             <div class="filter-chips source-chips">
               <label v-for="k in kindsPresent" :key="k" class="filter-chip">
                 <input v-model="shownKinds" type="checkbox" :value="k" />
@@ -204,7 +210,7 @@ const filteredChanges = computed<ChangeCollection>(() => ({
         </section>
 
         <details class="legend-section">
-          <summary><span>Map legend</span><span class="summary-chevron" aria-hidden="true">⌄</span></summary>
+          <summary class="disclosure">Map legend<Chevron /></summary>
           <Legend />
         </details>
 
@@ -304,14 +310,14 @@ const filteredChanges = computed<ChangeCollection>(() => ({
   padding: 4px 0;
   border: 0;
   background: transparent;
-  color: #858b83;
   cursor: pointer;
 }
-.panel-toggle:hover {
+.panel-toggle:hover .chevron {
   color: #276142;
 }
-.panel-toggle svg {
-  transition: transform 200ms ease;
+/* Points the way the panel will move: left to hide, right to show. */
+.panel-toggle .chevron {
+  transform: rotate(90deg);
 }
 /* Collapsed, the whole rail is the button; the arrow stays where it was. */
 .collapsed .panel-toggle {
@@ -321,8 +327,8 @@ const filteredChanges = computed<ChangeCollection>(() => ({
   height: 100%;
   padding-top: 34px;
 }
-.collapsed .panel-toggle svg {
-  transform: rotate(180deg);
+.collapsed .panel-toggle .chevron {
+  transform: rotate(-90deg);
 }
 .app-header {
   padding-right: 18px;
@@ -526,7 +532,6 @@ const filteredChanges = computed<ChangeCollection>(() => ({
 }
 :deep(.report summary) {
   margin-top: 3px;
-  cursor: pointer;
 }
 .summary-grid {
   display: grid;
@@ -588,27 +593,11 @@ const filteredChanges = computed<ChangeCollection>(() => ({
   font-size: 10px;
   font-weight: 600;
 }
-select {
-  width: 100%;
-  min-height: 37px;
-  padding: 0 32px 0 10px;
-  border: 1px solid #e2e1da;
-  border-radius: 8px;
-  background: #fff;
-  color: #293a30;
-  font: inherit;
-  font-size: 11px;
-}
-select:focus-visible,
 button:focus-visible,
 input:focus-visible,
 summary:focus-visible {
   outline: 2px solid #49865b;
   outline-offset: 2px;
-}
-select:disabled {
-  background: #f7f6f2;
-  color: #989a92;
 }
 .type-label {
   margin: 2px 0 -2px;
@@ -660,7 +649,6 @@ select:disabled {
 .advanced-filter summary {
   color: #747a72;
   font-size: 10px;
-  cursor: pointer;
 }
 .source-chips {
   margin-top: 8px;
@@ -729,27 +717,9 @@ select:disabled {
   padding: 0 2px 12px;
 }
 .legend-section summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   color: #47554a;
   font-size: 11px;
   font-weight: 650;
-  cursor: pointer;
-  list-style: none;
-}
-.legend-section summary::-webkit-details-marker,
-.legend-section summary::marker {
-  display: none;
-  content: '';
-}
-.summary-chevron {
-  color: #858b83;
-  font-size: 16px;
-  transition: transform 140ms ease;
-}
-.legend-section[open] .summary-chevron {
-  transform: rotate(180deg);
 }
 .legend-section :deep(.legend) {
   margin-top: 10px;
@@ -850,8 +820,8 @@ select:disabled {
     top: 14px;
     right: 8px;
   }
-  .panel-toggle svg {
-    transform: rotate(-90deg);
+  .panel-toggle .chevron {
+    transform: none;
   }
   .collapsed .panel-toggle {
     width: 100%;
@@ -859,8 +829,8 @@ select:disabled {
     place-items: center end;
     padding: 0 12px 0 0;
   }
-  .collapsed .panel-toggle svg {
-    transform: rotate(90deg);
+  .collapsed .panel-toggle .chevron {
+    transform: rotate(180deg);
   }
 }
 

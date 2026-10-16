@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { LoadReport } from '../composables/useBuildingChanges'
+import Chevron from './Chevron.vue'
 
 const props = defineProps<{ report: LoadReport }>()
 
@@ -20,7 +21,7 @@ const warnings = computed(() => props.report.issues.filter((i) => i.severity ===
         <span v-if="warnings.length" class="warn">· {{ warnings.length }} warning(s)</span>
       </p>
       <details v-if="report.issues.length" :open="skipped.length > 0">
-        <summary>View row details</summary>
+        <summary class="disclosure">View row details<Chevron /></summary>
         <ul>
           <li v-for="(issue, i) in report.issues" :key="i" :class="issue.severity === 'skipped' ? 'bad' : 'warn'">
             {{ issue.file }} · line {{ issue.line }}<template v-if="issue.id"> ({{ issue.id }})</template>
