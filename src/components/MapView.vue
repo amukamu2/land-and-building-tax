@@ -8,6 +8,7 @@ import {
   type GeoJSONSource,
   type LngLatBoundsLike,
   type MapMouseEvent,
+  type PaddingOptions,
   setWorkerUrl,
 } from 'maplibre-gl'
 // MapLibre v6 looks for its worker file next to its own script, which breaks once
@@ -236,20 +237,32 @@ function getSource(id: string) {
 }
 
 /** Zooms to a test area by its ID. */
-function fitToArea(areaId: string) {
+/** Screen space covered by UI floating over the map (e.g. the side panel), in px. */
+export type MapInset = Partial<PaddingOptions>
+
+function fitPadding(base: number, inset: MapInset = {}): PaddingOptions {
+  return {
+    top: base + (inset.top ?? 0),
+    right: base + (inset.right ?? 0),
+    bottom: base + (inset.bottom ?? 0),
+    left: base + (inset.left ?? 0),
+  }
+}
+
+function fitToArea(areaId: string, inset?: MapInset) {
   const area = props.testAreas.features.find((f) => f.properties.id === areaId)
   const ring = area?.geometry.coordinates[0]
   if (!map || !ring) return
   const [sw, , ne] = ring as [number, number][]
-  map.fitBounds([sw, ne] as LngLatBoundsLike, { padding: 40 })
+  map.fitBounds([sw, ne] as LngLatBoundsLike, { padding: fitPadding(40, inset) })
 }
 
 /** Zooms to fit all change points (used after loading a new file). */
-function fitToChanges() {
+function fitToChanges(inset?: MapInset) {
   const coords = props.changes.features.map((f) => f.geometry.coordinates as [number, number])
   if (!map || coords.length === 0) return
   const bounds = coords.reduce((b, c) => b.extend(c), new LngLatBounds(coords[0], coords[0]))
-  map.fitBounds(bounds, { padding: 60, maxZoom: 16 })
+  map.fitBounds(bounds, { padding: fitPadding(60, inset), maxZoom: 16 })
 }
 
 // Angular: like public methods on a component you reach via @ViewChild.

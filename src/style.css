@@ -18,3 +18,28 @@ body {
 #app {
   background: #f5f4ef;
 }
+
+/* Shared arrow (Chevron.vue) and expandable sections: every arrow looks the same and
+   flips when its section opens or closes. Usage: <details><summary class="disclosure">. */
+.chevron {
+  flex: none;
+  color: #858b83;
+  transition: transform 200ms ease;
+}
+summary.disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+summary.disclosure::-webkit-details-marker {
+  display: none;
+}
+summary.disclosure:hover .chevron {
+  color: #276142;
+}
+details[open] > summary.disclosure .chevron {
+  transform: rotate(180deg);
+}
