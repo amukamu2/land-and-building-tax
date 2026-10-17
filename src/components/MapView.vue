@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import {
   LngLatBounds,
   Map as MapLibreMap,
@@ -19,17 +19,21 @@ import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { ChangeCollection, ChangeProps, TestAreaCollection } from '../data/BuildingChangeSource'
 import { CHANGE_COLORS, TEST_AREA_COLOR } from '../mapStyle'
+import ChangeDetails from './ChangeDetails.vue'
+
+/** Screen space covered by UI floating over the map (e.g. the side panel), in px. */
+export type MapInset = Partial<PaddingOptions>
+
+const POPOVER_WIDTH = 340
+const POPOVER_HEIGHT = 240
 
 // Angular: `defineProps` ≈ @Input() and `defineEmits` ≈ @Output() EventEmitter.
 const props = defineProps<{
   changes: ChangeCollection
   testAreas: TestAreaCollection
   satellite: boolean
-}>()
-
-const emit = defineEmits<{
-  /** All change points under the click (several when points overlap). Empty = clicked nothing. */
-  select: [features: ChangeProps[]]
+  inset?: MapInset
+  getInset?: () => MapInset
 }>()
 
 setWorkerUrl(workerUrl)
@@ -41,6 +45,10 @@ const CLICK_TOLERANCE_PX = 6
 // Angular: a template ref ≈ @ViewChild. It matches `ref="container"` in the template
 // and is filled in by the time onMounted runs.
 const container = useTemplateRef<HTMLDivElement>('container')
+const popoverElement = useTemplateRef<HTMLDivElement>('popover')
+const popoverFeatures = ref<ChangeProps[]>([])
+const popoverCoordinates = ref<[number, number] | null>(null)
+const popoverPosition = ref({ left: 0, top: 0, placement: 'right' as 'right' | 'left' | 'above' | 'below' })
 
 // The map is NOT reactive state: Vue must not wrap it in a Proxy (that breaks MapLibre).
 // A plain variable is enough because the template never reads it.
@@ -68,6 +76,8 @@ onMounted(() => {
     loaded = true
   })
   m.on('click', onClick)
+  m.on('move', updatePopoverPosition)
+  m.on('resize', updatePopoverPosition)
   m.on('mouseenter', 'changes-circle', () => setCursor('pointer'))
   m.on('mouseleave', 'changes-circle', () => setCursor(''))
   map = m
@@ -87,7 +97,7 @@ watch(
     if (!loaded) return // `load` will pick up the current props
     getSource('changes')?.setData(withStackFlag(data))
     setSelected([])
-    emit('select', [])
+    closePopover()
   },
 )
 watch(
@@ -221,7 +231,85 @@ function onClick(e: MapMouseEvent) {
   const features = ids.map((id) => props.changes.features[id]?.properties).filter((p) => p !== undefined)
 
   setSelected(ids)
-  emit('select', features)
+  if (features.length === 0 || ids.length === 0) {
+    closePopover()
+    return
+  }
+
+  const firstId = ids[0]
+  if (firstId === undefined) return
+  const coordinates = props.changes.features[firstId]?.geometry.coordinates as [number, number] | undefined
+  if (!coordinates) return
+  popoverFeatures.value = features
+  popoverCoordinates.value = coordinates
+  focusPoint(coordinates)
+  void nextTick(updatePopoverPosition)
+}
+
+function focusPoint(coordinates: [number, number]) {
+  if (!map || !container.value) return
+  const inset = currentInset()
+  const mobile = container.value.clientWidth <= 820
+  const padding: PaddingOptions = mobile
+    ? {
+        top: 24 + (inset.top ?? 0),
+        right: 24 + (inset.right ?? 0),
+        bottom: 24 + (inset.bottom ?? 0) + POPOVER_HEIGHT,
+        left: 24 + (inset.left ?? 0),
+      }
+    : {
+        top: 24 + (inset.top ?? 0),
+        right: 24 + (inset.right ?? 0) + POPOVER_WIDTH,
+        bottom: 24 + (inset.bottom ?? 0),
+        left: 24 + (inset.left ?? 0),
+      }
+  map.easeTo({ center: coordinates, padding, duration: 500 })
+}
+
+function updatePopoverPosition() {
+  if (!map || !container.value || !popoverCoordinates.value || !popoverElement.value) return
+  const { width, height } = container.value.getBoundingClientRect()
+  const point = map.project(popoverCoordinates.value)
+  const card = popoverElement.value.getBoundingClientRect()
+  const inset = currentInset()
+  const mobile = width <= 820
+  const margin = 14
+
+  if (mobile) {
+    const leftLimit = margin + (inset.left ?? 0)
+    const rightLimit = width - margin - (inset.right ?? 0)
+    const left = Math.max(leftLimit + card.width / 2, Math.min(point.x, rightLimit - card.width / 2))
+    const visibleBottom = height - (inset.bottom ?? 0) - margin
+    const below = point.y + card.height + 22 <= visibleBottom
+    const top = below ? point.y + 18 : point.y - card.height - 18
+    popoverPosition.value = {
+      left,
+      top: Math.max(margin, Math.min(top, visibleBottom - card.height)),
+      placement: below ? 'below' : 'above',
+    }
+    return
+  }
+
+  const leftLimit = margin + (inset.left ?? 0)
+  const rightLimit = width - margin - (inset.right ?? 0)
+  const canPlaceRight = point.x + card.width + 20 <= rightLimit
+  const canPlaceLeft = point.x - card.width - 20 >= leftLimit
+  const placement = canPlaceRight ? 'right' : canPlaceLeft ? 'left' : 'right'
+  const left = placement === 'right'
+    ? Math.max(leftLimit, Math.min(point.x + 18, rightLimit - card.width))
+    : Math.max(leftLimit, point.x - card.width - 18)
+  const top = Math.max(margin, Math.min(point.y - card.height / 2, height - card.height - margin))
+  popoverPosition.value = { left, top, placement }
+}
+
+function closePopover() {
+  popoverFeatures.value = []
+  popoverCoordinates.value = null
+  setSelected([])
+}
+
+function currentInset(): MapInset {
+  return props.getInset?.() ?? props.inset ?? {}
 }
 
 function setSelected(ids: number[]) {
@@ -237,9 +325,6 @@ function getSource(id: string) {
 }
 
 /** Zooms to a test area by its ID. */
-/** Screen space covered by UI floating over the map (e.g. the side panel), in px. */
-export type MapInset = Partial<PaddingOptions>
-
 function fitPadding(base: number, inset: MapInset = {}): PaddingOptions {
   return {
     top: base + (inset.top ?? 0),
@@ -270,12 +355,118 @@ defineExpose({ fitToArea, fitToChanges })
 </script>
 
 <template>
-  <div ref="container" class="map"></div>
+  <div class="map-frame">
+    <div ref="container" class="map"></div>
+    <section
+      v-if="popoverFeatures.length"
+      ref="popover"
+      class="point-popover"
+      :class="`placement-${popoverPosition.placement}`"
+      :style="{ left: `${popoverPosition.left}px`, top: `${popoverPosition.top}px` }"
+      aria-label="Selected point details"
+    >
+      <header class="popover-header">
+        <strong>Selected point{{ popoverFeatures.length > 1 ? 's' : '' }}</strong>
+        <button class="popover-close" type="button" aria-label="Close point details" @click="closePopover">×</button>
+      </header>
+      <div class="popover-details">
+        <ChangeDetails :features="popoverFeatures" />
+      </div>
+    </section>
+  </div>
 </template>
 
 <style scoped>
+.map-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
 .map {
   width: 100%;
   height: 100%;
+}
+.point-popover {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  width: min(340px, calc(100% - 28px));
+  max-height: min(70dvh, 520px);
+  overflow: hidden;
+  padding: 13px;
+  border: 1px solid #e3e2dc;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 28px #1d2a241f;
+}
+.point-popover::before {
+  position: absolute;
+  top: 50%;
+  left: -7px;
+  width: 12px;
+  height: 12px;
+  border-bottom: 1px solid #e3e2dc;
+  border-left: 1px solid #e3e2dc;
+  background: #fff;
+  content: '';
+  transform: translateY(-50%) rotate(45deg);
+}
+.point-popover.placement-left::before {
+  right: -7px;
+  left: auto;
+  border: 0;
+  border-top: 1px solid #e3e2dc;
+  border-right: 1px solid #e3e2dc;
+  transform: translateY(-50%) rotate(45deg);
+}
+.point-popover.placement-below::before,
+.point-popover.placement-above::before {
+  top: -7px;
+  left: 50%;
+  border: 0;
+  border-top: 1px solid #e3e2dc;
+  border-left: 1px solid #e3e2dc;
+  transform: translateX(-50%) rotate(45deg);
+}
+.point-popover.placement-above::before {
+  top: auto;
+  bottom: -7px;
+  border: 0;
+  border-right: 1px solid #e3e2dc;
+  border-bottom: 1px solid #e3e2dc;
+}
+.popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: #34483a;
+  font-size: 13px;
+}
+.popover-close {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #667067;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.popover-close:hover {
+  background: #f1f3ef;
+}
+.popover-details {
+  max-height: calc(min(70dvh, 520px) - 52px);
+  overflow: auto;
+}
+@media (max-width: 820px) {
+  .point-popover {
+    max-height: min(40dvh, 340px);
+  }
+  .popover-details {
+    max-height: calc(min(40dvh, 340px) - 52px);
+  }
 }
 </style>

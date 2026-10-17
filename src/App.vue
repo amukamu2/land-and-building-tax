@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import MapView, { type MapInset } from './components/MapView.vue'
 import FileUpload from './components/FileUpload.vue'
 import Legend from './components/Legend.vue'
 import LoadReportView from './components/LoadReportView.vue'
-import ChangeDetails from './components/ChangeDetails.vue'
 import Chevron from './components/Chevron.vue'
 import SelectMenu, { type SelectOption } from './components/SelectMenu.vue'
 import { useBuildingChanges } from './composables/useBuildingChanges'
 import { CsvSource } from './data/CsvSource'
-import type { ChangeCollection, ChangeProps, ChangeType, RowKind } from './data/BuildingChangeSource'
+import type { ChangeCollection, ChangeType, RowKind } from './data/BuildingChangeSource'
 import { CHANGE_LABELS, KIND_LABELS } from './mapStyle'
 
 const { changes, testAreas, changesReport, testAreasReport, loadChanges, loadTestAreas, clear } =
@@ -17,7 +16,6 @@ const { changes, testAreas, changesReport, testAreasReport, loadChanges, loadTes
 
 const mapView = useTemplateRef<InstanceType<typeof MapView>>('mapView')
 const sidebar = useTemplateRef<HTMLElement>('sidebar')
-const selected = shallowRef<ChangeProps[]>([])
 const satellite = ref(false)
 const sidebarOpen = ref(true)
 const selectedAreaId = ref('')
@@ -214,20 +212,6 @@ const filteredChanges = computed<ChangeCollection>(() => ({
           <Legend />
         </details>
 
-        <section class="selected-section" aria-labelledby="selected-title">
-          <div class="section-heading">
-            <div>
-              <span class="eyebrow">POINT DETAILS</span>
-              <h2 id="selected-title">Selected points</h2>
-            </div>
-            <span v-if="selected.length" class="selected-count">{{ selected.length }}</span>
-          </div>
-          <ChangeDetails v-if="selected.length" :features="selected" />
-          <div v-else class="selection-empty">
-            <span class="selection-target" aria-hidden="true">◎</span>
-            <p>Select a point on the map to see its details</p>
-          </div>
-        </section>
       </div>
     </aside>
 
@@ -237,7 +221,7 @@ const filteredChanges = computed<ChangeCollection>(() => ({
         :changes="filteredChanges"
         :test-areas="testAreas"
         :satellite="satellite"
-        @select="selected = $event"
+        :get-inset="panelInset"
       />
       <div class="map-result-pill" role="status">
         <span class="status-dot" aria-hidden="true"></span>
@@ -736,41 +720,6 @@ summary:focus-visible {
 }
 .legend-section :deep(li) {
   align-items: center;
-}
-.selected-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-bottom: 4px;
-}
-.selected-count {
-  min-width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  border-radius: 20px;
-  background: #e8f0e8;
-  color: #396747;
-  font-size: 10px;
-  font-weight: 650;
-}
-.selection-empty {
-  min-height: 64px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px dashed #dddcd4;
-  border-radius: 9px;
-  color: #80857e;
-}
-.selection-empty p {
-  margin: 0;
-  font-size: 11px;
-}
-.selection-target {
-  color: #9aa49a;
-  font-size: 21px;
 }
 .map-result-pill {
   position: absolute;
