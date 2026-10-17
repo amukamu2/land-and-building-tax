@@ -10,6 +10,7 @@ import { useBuildingChanges } from './composables/useBuildingChanges'
 import { CsvSource } from './data/CsvSource'
 import type { ChangeCollection, ChangeType, RowKind } from './data/BuildingChangeSource'
 import { CHANGE_LABELS, KIND_LABELS } from './mapStyle'
+import brandMark from './assets/building-change-mark.svg'
 
 const { changes, testAreas, changesReport, testAreasReport, loadChanges, loadTestAreas, clear } =
   useBuildingChanges()
@@ -99,7 +100,7 @@ const filteredChanges = computed<ChangeCollection>(() => ({
 
       <div id="sidebar-content" class="sidebar-content">
         <header class="app-header">
-          <div class="brand-mark" aria-hidden="true">↗</div>
+          <img class="brand-mark" :src="brandMark" alt="" aria-hidden="true" />
           <div class="brand-copy">
             <h1>Building Change Map</h1>
             <p class="subtitle">Building changes across Bangkok</p>
@@ -356,11 +357,11 @@ const filteredChanges = computed<ChangeCollection>(() => ({
   flex: none;
   display: grid;
   place-items: center;
+  padding: 6px;
+  box-sizing: border-box;
   border-radius: 12px;
   background: #e7f0e8;
-  color: #276142;
-  font-size: 25px;
-  font-weight: 700;
+  object-fit: contain;
 }
 .brand-copy h1 {
   margin: 0;
