@@ -283,6 +283,8 @@ const filteredChanges = computed<ChangeCollection>(() => ({
   height: 100%;
   box-sizing: border-box;
   overflow-y: auto;
+  /* Still scrolls (wheel, touch, keyboard), but without a scrollbar eating into the layout. */
+  scrollbar-width: none;
   padding: 22px 20px 26px;
   display: flex;
   flex-direction: column;
@@ -290,6 +292,9 @@ const filteredChanges = computed<ChangeCollection>(() => ({
   transition:
     opacity 120ms ease,
     visibility 0s;
+}
+.sidebar-content::-webkit-scrollbar {
+  display: none;
 }
 .collapsed .sidebar-content {
   opacity: 0;
