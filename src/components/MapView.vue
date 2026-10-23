@@ -460,6 +460,11 @@ defineExpose({ fitToArea, fitToChanges })
 .popover-details {
   max-height: calc(min(70dvh, 520px) - 52px);
   overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.popover-details::-webkit-scrollbar {
+  display: none;
 }
 @media (max-width: 820px) {
   .point-popover {
