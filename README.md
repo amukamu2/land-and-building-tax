@@ -2,6 +2,8 @@
 
 Interactive map of building changes (gone / new) in Bangkok, loaded from CSV.
 
+Live demo: [Building Change Map](https://spiffy-sprite-aee5af.netlify.app/)
+
 ## Run
 
 ```sh
