@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef } from 'vue'
+import { computed, ref, shallowRef, useTemplateRef } from 'vue'
 import MapView, { type MapInset } from './components/MapView.vue'
 import FileUpload from './components/FileUpload.vue'
+import LoadedFiles from './components/LoadedFiles.vue'
 import Legend from './components/Legend.vue'
 import LoadReportView from './components/LoadReportView.vue'
 import Chevron from './components/Chevron.vue'
@@ -12,7 +13,17 @@ import type { ChangeCollection, ChangeType, RowKind } from './data/BuildingChang
 import { CHANGE_LABELS, KIND_LABELS } from './mapStyle'
 import brandMark from './assets/building-change-mark.svg'
 
-const { changes, testAreas, changesReport, testAreasReport, loadChanges, loadTestAreas, clear } =
+const {
+  changes,
+  testAreas,
+  changesReport,
+  testAreasReport,
+  loadChanges,
+  loadTestAreas,
+  clearChanges,
+  clearTestAreas,
+  clear,
+} =
   useBuildingChanges()
 
 const mapView = useTemplateRef<InstanceType<typeof MapView>>('mapView')
@@ -21,10 +32,51 @@ const satellite = ref(false)
 const sidebarOpen = ref(true)
 const selectedAreaId = ref('')
 
-async function onChangeFiles(files: File[]) {
-  const label = files.map((f) => f.name).join(' + ')
-  if (await loadChanges(new CsvSource({ changes: files }), label)) mapView.value?.fitToChanges(panelInset())
+// --- Imported files ---
+// Imports add to what's loaded instead of replacing it. Every change reloads the whole set,
+// so duplicate IDs are caught across files. The file lists only change when loading
+// succeeds; on an error the previous data stays on the map.
+const changeFiles = shallowRef<File[]>([])
+const areaFiles = shallowRef<File[]>([])
+
+/** Adds files to a list. A file with a name already in the list replaces it (re-import an edited CSV). */
+async function addFiles(current: File[], added: File[]): Promise<File[]> {
+  // Keep an in-memory copy: the original File can't be read again once it's edited
+  // or moved on disk, which would break reloading after removing another file.
+  const copies = await Promise.all(added.map(async (f) => new File([await f.arrayBuffer()], f.name, { type: f.type })))
+  const byName = new Map(copies.map((f) => [f.name, f]))
+  const replaced = current.map((f) => byName.get(f.name) ?? f) // keeps a re-imported file's place
+  const known = new Set(current.map((f) => f.name))
+  return [...replaced, ...copies.filter((f) => !known.has(f.name))]
 }
+
+const fileLabel = (files: File[]) => files.map((f) => f.name).join(' + ')
+
+async function setChangeFiles(files: File[]): Promise<boolean> {
+  if (!files.length) clearChanges()
+  else if (!(await loadChanges(new CsvSource({ changes: files }), fileLabel(files)))) return false
+  changeFiles.value = files
+  return true
+}
+
+async function setAreaFiles(files: File[]): Promise<boolean> {
+  if (!files.length) clearTestAreas()
+  else if (!(await loadTestAreas(new CsvSource({ testAreas: files }), fileLabel(files)))) return false
+  areaFiles.value = files
+  if (!testAreas.value.features.some((a) => a.properties.id === selectedAreaId.value)) selectedAreaId.value = ''
+  return true
+}
+
+async function onChangeFiles(added: File[]) {
+  if (await setChangeFiles(await addFiles(changeFiles.value, added))) mapView.value?.fitToChanges(panelInset())
+}
+
+async function onAreaFiles(added: File[]) {
+  await setAreaFiles(await addFiles(areaFiles.value, added))
+}
+
+const removeChangeFile = (name: string) => setChangeFiles(changeFiles.value.filter((f) => f.name !== name))
+const removeAreaFile = (name: string) => setAreaFiles(areaFiles.value.filter((f) => f.name !== name))
 
 // The panel floats over the map, so zooming to fit must leave room for whatever it covers:
 // its width on the left (desktop) or its height along the bottom (phone bottom sheet).
@@ -34,13 +86,10 @@ function panelInset(): MapInset {
   return rect.top > 0 ? { bottom: window.innerHeight - rect.top } : { left: rect.right }
 }
 
-async function onAreaFile([file]: File[]) {
-  if (file) await loadTestAreas(new CsvSource({ testAreas: file }), file.name)
-  selectedAreaId.value = ''
-}
-
 function clearData() {
   clear()
+  changeFiles.value = []
+  areaFiles.value = []
   selectedAreaId.value = ''
   year.value = 'all'
 }
@@ -134,9 +183,11 @@ const filteredChanges = computed<ChangeCollection>(() => ({
             <div class="primary-upload">
               <FileUpload label="Import change points (CSV)" multiple @files="onChangeFiles" />
             </div>
+            <LoadedFiles :files="changeFiles" @remove="removeChangeFile" />
             <LoadReportView v-if="changesReport" :report="changesReport" />
             <div class="upload-divider" aria-hidden="true"><span>AND</span></div>
-            <FileUpload label="Test areas (CSV)" @files="onAreaFile" />
+            <FileUpload label="Test areas (CSV)" multiple @files="onAreaFiles" />
+            <LoadedFiles :files="areaFiles" @remove="removeAreaFile" />
             <LoadReportView v-if="testAreasReport" :report="testAreasReport" />
           </div>
         </section>

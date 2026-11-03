@@ -29,7 +29,8 @@ export type CsvInput = File | { url: string; name: string }
 export interface CsvSourceOptions {
   /** One or more change tables (code output and/or answer key). Their rows are merged. */
   changes?: CsvInput[]
-  testAreas?: CsvInput
+  /** One or more test-area tables. Their rows are merged. */
+  testAreas?: CsvInput[]
 }
 
 /** Rough box around Bangkok. Coordinates outside it are almost certainly a mistake. */
@@ -83,18 +84,27 @@ export class CsvSource implements BuildingChangeSource {
       rowCount: 0,
       issues: [],
     }
-    const input = this.options.testAreas
-    if (!input) return result
+    const seenIds = new Set<string>()
 
-    const { rows, headers } = await readCsv(input)
-    const file = input.name
-    const cols = mapHeaders(headers, TEST_AREA_COLUMNS, REQUIRED_TEST_AREA_COLUMNS, file)
-    result.rowCount = rows.length
+    for (const input of this.options.testAreas ?? []) {
+      const { rows, headers } = await readCsv(input)
+      const file = input.name
+      const cols = mapHeaders(headers, TEST_AREA_COLUMNS, REQUIRED_TEST_AREA_COLUMNS, file)
+      result.rowCount += rows.length
 
-    rows.forEach((row, i) => {
-      const feature = parseTestAreaRow(row, cols, file, i + 2, result.issues)
-      if (feature) result.data.features.push(feature)
-    })
+      rows.forEach((row, i) => {
+        const line = i + 2 // +1 for 1-based, +1 for the header line
+        const feature = parseTestAreaRow(row, cols, file, line, result.issues)
+        if (!feature) return
+
+        const id = feature.properties.id
+        if (seenIds.has(id)) {
+          result.issues.push({ file, line, id, severity: 'warning', message: `Duplicate ID "${id}".` })
+        }
+        seenIds.add(id)
+        result.data.features.push(feature)
+      })
+    }
     return result
   }
 }

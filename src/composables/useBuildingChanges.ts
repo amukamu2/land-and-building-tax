@@ -66,15 +66,36 @@ export function useBuildingChanges() {
     }
   }
 
-  /** Removes all loaded points and test areas. */
-  function clear() {
+  /** Removes all loaded change points. */
+  function clearChanges() {
     changes.value = emptyCollection()
-    testAreas.value = emptyCollection()
     changesReport.value = null
+  }
+
+  /** Removes all loaded test areas. */
+  function clearTestAreas() {
+    testAreas.value = emptyCollection()
     testAreasReport.value = null
   }
 
-  return { changes, testAreas, changesReport, testAreasReport, loading, loadChanges, loadTestAreas, clear }
+  /** Removes all loaded points and test areas. */
+  function clear() {
+    clearChanges()
+    clearTestAreas()
+  }
+
+  return {
+    changes,
+    testAreas,
+    changesReport,
+    testAreasReport,
+    loading,
+    loadChanges,
+    loadTestAreas,
+    clearChanges,
+    clearTestAreas,
+    clear,
+  }
 }
 
 function report(label: string, rowCount: number, loadedCount: number, issues: RowIssue[]): LoadReport {
