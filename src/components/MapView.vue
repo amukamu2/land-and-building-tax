@@ -209,11 +209,11 @@ function addLayers() {
     CHANGE_COLORS.unknown,
   ];
   const radius = 9;
-  // A "new" dot sharing its spot with another point shrinks so the one under it stays visible.
+  // Shrink a new-building dot when a removed-building dot shares its location.
   const codeRadius: ExpressionSpecification = [
     "case",
-    ["all", ["get", "stacked"], ["==", ["get", "type"], "new"]],
-    5.5,
+    ["all", ["get", "mixedTypes"], ["==", ["get", "type"], "new"]],
+    9,
     radius,
   ];
 
@@ -227,31 +227,55 @@ function addLayers() {
       "circle-sort-key": ["match", ["get", "type"], "gone", 0, "unknown", 1, 2],
     },
     paint: {
-      "circle-radius": ["case", isAnswer, radius + 4, codeRadius],
+      "circle-radius": ["case", isAnswer, radius + 4, ["all", ["get", "mixedTypes"], ["==", ["get", "type"], "gone"]], 11, codeRadius],
       "circle-color": typeColor,
       "circle-opacity": ["case", isAnswer, 0, 0.95],
-      "circle-stroke-color": ["case", isAnswer, typeColor, "#ffffff"],
+      "circle-stroke-color": ["case", isAnswer, typeColor, ["all", ["get", "mixedTypes"], ["==", ["get", "type"], "gone"]], CHANGE_COLORS.gone, "#ffffff"],
       "circle-stroke-width": ["case", isAnswer, 3, 1.5],
+    },
+  });
+
+  // Draw an adjacent outline for repeated filled markers of the same type.
+  map.addLayer({
+    id: "changes-multiple",
+    type: "circle",
+    source: "changes",
+    filter: ["all", ["==", ["get", "multipleSameType"], true], ["==", ["get", "mixedTypes"], false]],
+    layout: { "circle-sort-key": ["match", ["get", "type"], "gone", 0, 1] },
+    paint: {
+      "circle-radius": ["case", ["all", ["get", "mixedTypes"], ["==", ["get", "type"], "new"]], 7, 10.5],
+      "circle-color": typeColor,
+      "circle-opacity": 0,
+      "circle-stroke-color": typeColor,
+      "circle-stroke-width": 2,
     },
   });
 }
 
-/**
- * Adds a display-only `stacked` flag to points that share their exact position with
- * another point. Feature order is kept, so `generateId` ids still match `props.changes`.
- */
+/** Group markers by coordinates rounded to six decimal places for display. */
 function withStackFlag(data: ChangeCollection): ChangeCollection {
   const key = (f: ChangeCollection["features"][number]) =>
-    f.geometry.coordinates.join(",");
-  const counts = new Map<string, number>();
-  for (const f of data.features)
-    counts.set(key(f), (counts.get(key(f)) ?? 0) + 1);
+    f.geometry.coordinates.map((coordinate) => coordinate.toFixed(6)).join(",");
+  const groups = new Map<string, { new: number; gone: number; unknown: number }>();
+  for (const f of data.features) {
+    if (f.properties.kind === "answer") continue;
+    const group = groups.get(key(f)) ?? { new: 0, gone: 0, unknown: 0 };
+    group[f.properties.type]++;
+    groups.set(key(f), group);
+  }
   return {
     ...data,
-    features: data.features.map((f) => ({
-      ...f,
-      properties: { ...f.properties, stacked: (counts.get(key(f)) ?? 0) > 1 },
-    })),
+    features: data.features.map((f) => {
+      const group = groups.get(key(f));
+      return {
+        ...f,
+        properties: {
+          ...f.properties,
+          mixedTypes: !!group && group.new > 0 && group.gone > 0,
+          multipleSameType: f.properties.kind !== "answer" && !!group && group[f.properties.type] > 1,
+        },
+      };
+    }),
   };
 }
 
