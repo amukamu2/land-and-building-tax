@@ -245,7 +245,7 @@ function parseYesNo(text: string): boolean | null {
 
 function kindFromId(id: string): RowKind {
   const prefix = id.charAt(0).toUpperCase()
-  return prefix === 'A' ? 'answer' : prefix === 'C' ? 'code' : 'other'
+  return (prefix === 'A' || prefix === 'Q') ? 'answer' : prefix === 'C' ? 'code' : 'other'
 }
 
 function cell(row: RawRow, header: string | undefined): string {

@@ -13,8 +13,12 @@ const types: ChangeType[] = ['gone', 'new', 'unknown']
       {{ CHANGE_LABELS[type] }}
     </li>
     <li>
-      <span class="dot ring"></span>
-      Ring = answer key (A…) · solid dot = model output (C…)
+      <span class="answer-ring"></span>
+      Dashed ring = answer key (A… / Q…) · solid dot = model output
+    </li>
+    <li>
+      <span class="added-marker"></span>
+      Added after seeing model output
     </li>
     <li>
       <span class="box" :style="{ borderColor: TEST_AREA_COLOR }"></span>
@@ -45,10 +49,22 @@ li {
   box-shadow: 0 0 0 1px #0003;
   flex: none;
 }
-.dot.ring {
+.answer-ring {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
   background: transparent;
-  border: 3px solid #555;
+  border: 3px dashed #555;
   box-shadow: none;
+}
+.added-marker {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: #e87919;
+  border: 1px solid white;
 }
 .box {
   width: 16px;

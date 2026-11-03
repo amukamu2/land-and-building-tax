@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, useTemplateRef } from 'vue'
+import { computed, onMounted, ref, shallowRef, useTemplateRef } from 'vue'
 import MapView, { type MapInset } from './components/MapView.vue'
 import FileUpload from './components/FileUpload.vue'
 import LoadedFiles from './components/LoadedFiles.vue'
@@ -14,7 +14,7 @@ import { CHANGE_LABELS, KIND_LABELS } from './mapStyle'
 import brandMark from './assets/building-change-mark.svg'
 
 const {
-  changes,
+  changes: uploadedChanges,
   testAreas,
   changesReport,
   testAreasReport,
@@ -31,6 +31,22 @@ const sidebar = useTemplateRef<HTMLElement>('sidebar')
 const satellite = ref(false)
 const sidebarOpen = ref(true)
 const selectedAreaId = ref('')
+const showAnswerKey = ref(false)
+const answerKey = shallowRef<ChangeCollection>({ type: 'FeatureCollection', features: [] })
+const answerError = ref('')
+onMounted(async () => {
+  try {
+    const source = new CsvSource({ changes: [{ url: `${import.meta.env.BASE_URL}answer/apm_answer_key_round1.csv`, name: 'apm_answer_key_round1.csv' }] })
+    answerKey.value = (await source.getChanges()).data
+  } catch {
+    answerError.value = 'Could not load the APM answer key. Please reload the page.'
+  }
+})
+const changes = computed<ChangeCollection>(() => ({
+  type: 'FeatureCollection',
+  features: [...(showAnswerKey.value ? answerKey.value.features : []), ...uploadedChanges.value.features],
+}))
+
 
 // --- Imported files ---
 // Imports add to what's loaded instead of replacing it. Every change reloads the whole set,
@@ -88,6 +104,7 @@ function panelInset(): MapInset {
 
 function clearData() {
   clear()
+  showAnswerKey.value = false
   changeFiles.value = []
   areaFiles.value = []
   selectedAreaId.value = ''
@@ -179,6 +196,12 @@ const filteredChanges = computed<ChangeCollection>(() => ({
           </div>
 
           <div class="upload-card">
+            <label class="imagery-toggle answer-toggle">
+              <span class="toggle-copy">APM answer key</span>
+              <input v-model="showAnswerKey" type="checkbox" :disabled="!!answerError" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <p v-if="answerError" class="answer-error" role="alert">{{ answerError }}</p>
             <!-- Vue: `@files="…"` listens to the child's emitted event, like Angular `(files)="…"`. -->
             <div class="primary-upload">
               <FileUpload label="Import change points (CSV)" multiple @files="onChangeFiles" />
@@ -504,6 +527,8 @@ const filteredChanges = computed<ChangeCollection>(() => ({
   border-radius: 12px;
   background: #fff;
 }
+.answer-toggle { border-top: 0; padding-top: 0; }
+.answer-error { color: #a63327; font-size: 11px; margin: 0; }
 .upload-card {
   display: flex;
   flex-direction: column;

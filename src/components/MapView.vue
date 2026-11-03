@@ -101,6 +101,8 @@ onMounted(() => {
   m.on("resize", updatePopoverPosition);
   m.on("mouseenter", "changes-circle", () => setCursor("pointer"));
   m.on("mouseleave", "changes-circle", () => setCursor(""));
+  m.on("mouseenter", "answers-dashed", () => setCursor("pointer"));
+  m.on("mouseleave", "answers-dashed", () => setCursor(""));
   map = m;
 });
 
@@ -221,6 +223,7 @@ function addLayers() {
     id: "changes-circle",
     type: "circle",
     source: "changes",
+    filter: ["!=", ["get", "kind"], "answer"],
     layout: {
       // Higher sort key = drawn on top. Points at the same spot cover each other;
       // clicking there still lists all of them in the side panel.
@@ -232,6 +235,46 @@ function addLayers() {
       "circle-opacity": ["case", isAnswer, 0, 0.95],
       "circle-stroke-color": ["case", isAnswer, typeColor, ["all", ["get", "mixedTypes"], ["==", ["get", "type"], "gone"]], CHANGE_COLORS.gone, "#ffffff"],
       "circle-stroke-width": ["case", isAnswer, 3, 1.5],
+    },
+  });
+
+  // Dashed answer rings sit outside filled markers and remain clickable when overlapping.
+  for (const [type, color] of Object.entries(CHANGE_COLORS)) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 40;
+    const ctx = canvas.getContext("2d")!;
+    ctx.beginPath();
+    ctx.arc(20, 20, 17, 0, Math.PI * 2);
+    ctx.setLineDash([5, 3]);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    map.addImage(`answer-${type}`, ctx.getImageData(0, 0, 40, 40));
+  }
+  map.addLayer({
+    id: "answers-dashed",
+    type: "symbol",
+    source: "changes",
+    filter: ["==", ["get", "kind"], "answer"],
+    layout: {
+      "icon-image": ["concat", "answer-", ["get", "type"]],
+      "icon-allow-overlap": true,
+      "icon-ignore-placement": true,
+    },
+  });
+
+  // Orange dot identifies answers added after viewing the model output.
+  map.addLayer({
+    id: "answers-added-after-code",
+    type: "circle",
+    source: "changes",
+    filter: ["all", ["==", ["get", "kind"], "answer"], ["==", ["get", "addedAfterCode"], true]],
+    paint: {
+      "circle-radius": 4,
+      "circle-color": "#e87919",
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 1,
+      "circle-translate": [12, -12],
     },
   });
 
@@ -287,7 +330,7 @@ function onClick(e: MapMouseEvent) {
       [x - CLICK_TOLERANCE_PX, y - CLICK_TOLERANCE_PX],
       [x + CLICK_TOLERANCE_PX, y + CLICK_TOLERANCE_PX],
     ],
-    { layers: ["changes-circle"] },
+    { layers: ["changes-circle", "answers-dashed"] },
   );
   // Look the rows up in our own data instead of using `hit.properties`, because
   // MapLibre drops/serializes some property values. Dedupe: a feature can be hit twice.
